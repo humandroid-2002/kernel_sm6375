@@ -22,7 +22,7 @@ const char *migrate_type_names[] = {"GROUP_TO_RQ", "RQ_TO_GROUP",
 #define SCHED_FREQ_ACCOUNT_WAIT_TIME 0
 #define SCHED_ACCOUNT_WAIT_TIME 1
 
-#define EARLY_DETECTION_DURATION 9500000
+#define EARLY_DETECTION_DURATION 6000000
 #define MAX_NUM_CGROUP_COLOC_ID 20
 
 #define WINDOW_STATS_RECENT		0
@@ -37,7 +37,7 @@ const char *migrate_type_names[] = {"GROUP_TO_RQ", "RQ_TO_GROUP",
 #define FREQ_REPORT_CPU_LOAD			1
 #define FREQ_REPORT_TOP_TASK			2
 
-#define NEW_TASK_ACTIVE_TIME 100000000
+#define NEW_TASK_ACTIVE_TIME 150000000
 
 static ktime_t ktime_last;
 static bool sched_ktime_suspended;
@@ -107,10 +107,21 @@ static void release_rq_locks_irqrestore(const cpumask_t *cpus,
 	local_irq_restore(*flags);
 }
 
-unsigned int sysctl_sched_capacity_margin_up[MAX_MARGIN_LEVELS] = {
-			[0 ... MAX_MARGIN_LEVELS-1] = 1078}; /* ~5% margin */
-unsigned int sysctl_sched_capacity_margin_down[MAX_MARGIN_LEVELS] = {
-			[0 ... MAX_MARGIN_LEVELS-1] = 1205}; /* ~15% margin */
+unsigned int sysctl_sched_capacity_margin_up[MAX_MARGIN_LEVELS];
+unsigned int sysctl_sched_capacity_margin_down[MAX_MARGIN_LEVELS];
+
+static int __init walt_init_capacity_margins(void)
+{
+	int i;
+
+	for (i = 0; i < MAX_MARGIN_LEVELS; i++) {
+		sysctl_sched_capacity_margin_up[i] = 1040;   /* ~ +2% */
+		sysctl_sched_capacity_margin_down[i] = 1250; /* ~ +22% */
+	}
+
+	return 0;
+}
+early_initcall(walt_init_capacity_margins);
 
 unsigned int sysctl_walt_cpu_high_irqload = 95;
 static unsigned int walt_cpu_high_irqload;
@@ -149,7 +160,7 @@ static __read_mostly unsigned int walt_cpu_util_freq_divisor;
 /* Initial task load. Newly created tasks are assigned this load. */
 unsigned int __read_mostly sched_init_task_load_windows;
 unsigned int __read_mostly sched_init_task_load_windows_scaled;
-unsigned int __read_mostly sysctl_sched_init_task_load_pct = 15;
+unsigned int __read_mostly sysctl_sched_init_task_load_pct = 20;
 
 unsigned int max_possible_capacity = 1024; /* max(rq->max_possible_capacity) */
 unsigned int

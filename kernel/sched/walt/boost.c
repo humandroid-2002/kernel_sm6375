@@ -124,11 +124,13 @@ static void sched_conservative_boost_exit(void)
 static void sched_restrained_boost_enter(void)
 {
 	walt_enable_frequency_aggregation(true);
+	core_ctl_set_boost(true);
 }
 
 static void sched_restrained_boost_exit(void)
 {
 	walt_enable_frequency_aggregation(false);
+	core_ctl_set_boost(false);
 }
 
 struct sched_boost_data {
@@ -317,3 +319,35 @@ done:
 	mutex_unlock(&boost_mutex);
 	return ret;
 }
+
+static int __init sched_boost_early_init(void)
+{
+	/* FULL_THROTTLE boost at boot */
+	mutex_lock(&boost_mutex);
+	_sched_set_boost(FULL_THROTTLE_BOOST);
+	mutex_unlock(&boost_mutex);
+
+	pr_info("WALT: FULL_THROTTLE boost enabled at boot\n");
+	return 0;
+}
+early_initcall(sched_boost_early_init);
+
+static void sched_boost_release_work(struct work_struct *work);
+static DECLARE_DELAYED_WORK(sched_boost_release, sched_boost_release_work);
+
+static void sched_boost_release_work(struct work_struct *work)
+{
+	mutex_lock(&boost_mutex);
+	_sched_set_boost(NO_BOOST);
+	mutex_unlock(&boost_mutex);
+
+	pr_info("WALT: boot boost released\n");
+}
+
+static int __init sched_boost_release_init(void)
+{
+	/* Release boost after 5 seconds */
+	schedule_delayed_work(&sched_boost_release, 5 * HZ);
+	return 0;
+}
+late_initcall(sched_boost_release_init);

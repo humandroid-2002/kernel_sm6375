@@ -179,8 +179,8 @@
 			reg = <0x0 0x600>;
 			cpu-idle-states = <&GOLD_PC &GOLD_RAIL_OFF>;
 			enable-method = "psci";
-			capacity-dmips-mhz = <1946>;
-			dynamic-power-coefficient = <520>;
+			capacity-dmips-mhz = <2250>;
+			dynamic-power-coefficient = <600>;
 			cpu-release-addr = <0x0 0x50000000>;
 			next-level-cache = <&L2_6>;
 			qcom,freq-domain = <&cpufreq_hw 1 2>;
@@ -198,8 +198,8 @@
 			reg = <0x0 0x700>;
 			cpu-idle-states = <&GOLD_PC &GOLD_RAIL_OFF>;
 			enable-method = "psci";
-			capacity-dmips-mhz = <1946>;
-			dynamic-power-coefficient = <520>;
+			capacity-dmips-mhz = <2250>;
+			dynamic-power-coefficient = <600>;
 			cpu-release-addr = <0x0 0x50000000>;
 			next-level-cache = <&L2_7>;
 			qcom,freq-domain = <&cpufreq_hw 1 2>;
@@ -1461,7 +1461,8 @@
 			< 1516800  921600000 >,
 			< 1651200 1171200000 >,
 			< 1900800 1382400000 >,
-			< 2054400 1497600000 >;
+			< 2054400 1497600000 >,
+			< 2208000 1600000000 >;
 	};
 
 	cpu_memlat_cpugrp: qcom,cpu-cpugrp {
@@ -1518,15 +1519,15 @@
 
 		cpu0_cpu_ddr_latmon: qcom,cpu0-cpu-ddr-latmon {
 			compatible = "qcom,arm-memlat-mon";
-			qcom,cpulist = <&CPU0 &CPU1 &CPU2 &CPU3 &CPU4 &CPU5>;
+			qcom,cpulist = <&CPU0 &CPU1 &CPU2 &CPU3 &CPU4 &CPU5 &CPU6 &CPU7>;
 			qcom,target-dev = <&cpu0_cpu_ddr_lat>;
 			qcom,cachemiss-ev = <0x2A>;
 			qcom,core-dev-table =
-					<  691200 MHZ_TO_MBPS(  300, 4) >,
-					<  940800 MHZ_TO_MBPS(  451, 4) >,
-					< 1113600 MHZ_TO_MBPS(  547, 4) >,
-					< 1516800 MHZ_TO_MBPS(  768, 4) >,
-					< 1804800 MHZ_TO_MBPS( 1017, 4) >;
+					<  691200 MHZ_TO_MBPS(  350, 4) >,
+					<  940800 MHZ_TO_MBPS(  500, 4) >,
+					< 1113600 MHZ_TO_MBPS(  650, 4) >,
+					< 1516800 MHZ_TO_MBPS(  900, 4) >,
+					< 1804800 MHZ_TO_MBPS( 1150, 4) >;
 		};
 
 		cpu0_computemon: qcom,cpu0-computemon {
@@ -1566,11 +1567,12 @@
 			qcom,target-dev = <&cpu6_cpu_ddr_lat>;
 			qcom,cachemiss-ev = <0x2A>;
 			qcom,core-dev-table =
-					<  940800 MHZ_TO_MBPS( 547, 4) >,
-					< 1228800 MHZ_TO_MBPS(1017, 4) >,
-					< 1516800 MHZ_TO_MBPS(1555, 4) >,
-					< 1900800 MHZ_TO_MBPS(1804, 4) >,
-					< 2054400 MHZ_TO_MBPS(2092, 4) >;
+					<  940800  MHZ_TO_MBPS( 600, 4) >,
+					< 1228800  MHZ_TO_MBPS(1100, 4) >,
+					< 1516800  MHZ_TO_MBPS(1600, 4) >,
+					< 1900800  MHZ_TO_MBPS(2000, 4) >,
+					< 2054400  MHZ_TO_MBPS(2400, 4) >,
+					< 2208000  MHZ_TO_MBPS(2800, 4) >;
 		};
 
 		cpu6_computemon: qcom,cpu6-computemon {
@@ -1578,12 +1580,13 @@
 			qcom,cpulist = <&CPU6 &CPU7>;
 			qcom,target-dev = <&cpu6_cpu_ddr_latfloor>;
 			qcom,core-dev-table =
-					< 1248800 MHZ_TO_MBPS( 547, 4) >,
-					< 1401600 MHZ_TO_MBPS( 768, 4) >,
-					< 1516800 MHZ_TO_MBPS(1017, 4) >,
-					< 1651200 MHZ_TO_MBPS(1555, 4) >,
-					< 1900800 MHZ_TO_MBPS(1804, 4) >,
-					< 2054400 MHZ_TO_MBPS(2092, 4) >;
+					< 1248800 MHZ_TO_MBPS( 600, 4) >,
+					< 1401600 MHZ_TO_MBPS( 900, 4) >,
+					< 1516800 MHZ_TO_MBPS(1200, 4) >,
+					< 1651200 MHZ_TO_MBPS(1600, 4) >,
+					< 1900800 MHZ_TO_MBPS(2000, 4) >,
+					< 2054400 MHZ_TO_MBPS(2400, 4) >,
+					< 2208000 MHZ_TO_MBPS(2800, 4) >;
 		};
 	};
 

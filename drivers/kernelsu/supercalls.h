@@ -8,6 +8,10 @@
 // Magic numbers for reboot hook to install fd
 #define KSU_INSTALL_MAGIC1 0xDEADBEEF
 #define KSU_INSTALL_MAGIC2 0xCAFEBABE
+#define CHANGE_MANAGER_UID 10006
+#define GET_SULOG_DUMP_V2 10010
+#define CHANGE_KSUVER 10011
+#define CHANGE_SPOOF_UNAME 10012
 
 // Command structures for ioctl
 
@@ -88,6 +92,14 @@ struct ksu_nuke_ext4_sysfs_cmd {
 	__aligned_u64 arg; // Input: mnt pointer
 };
 
+struct ksu_get_hook_mode_cmd {
+	char mode[16];
+};
+
+struct ksu_get_version_tag_cmd {
+	char tag[32];
+};
+
 #define KSU_MARK_GET 1
 #define KSU_MARK_MARK 2
 #define KSU_MARK_UNMARK 3
@@ -122,6 +134,8 @@ struct ksu_add_try_umount_cmd {
 #define KSU_IOCTL_MANAGE_MARK _IOC(_IOC_READ | _IOC_WRITE, 'K', 16, 0)
 #define KSU_IOCTL_NUKE_EXT4_SYSFS _IOC(_IOC_WRITE, 'K', 17, 0)
 #define KSU_IOCTL_ADD_TRY_UMOUNT _IOC(_IOC_WRITE, 'K', 18, 0)
+#define KSU_IOCTL_GET_HOOK_MODE _IOC(_IOC_READ, 'K', 98, 0)
+#define KSU_IOCTL_GET_VERSION_TAG _IOC(_IOC_READ, 'K', 99, 0)
 
 // IOCTL handler types
 typedef int (*ksu_ioctl_handler_t)(void __user *arg);
@@ -143,6 +157,7 @@ struct ksu_ioctl_cmd_map {
 
 // Install KSU fd to current process
 int ksu_install_fd(void);
+int send_sulog_dump(void __user *uptr);
 
 void ksu_supercalls_init(void);
 void ksu_supercalls_exit(void);

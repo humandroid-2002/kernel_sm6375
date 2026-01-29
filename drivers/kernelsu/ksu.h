@@ -6,7 +6,6 @@
 #include <linux/cred.h>
 
 #define KERNEL_SU_VERSION KSU_VERSION
-
 #define EVENT_POST_FS_DATA 1
 #define EVENT_BOOT_COMPLETED 2
 #define EVENT_MODULE_MOUNTED 3

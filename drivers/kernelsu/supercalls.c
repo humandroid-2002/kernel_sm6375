@@ -36,6 +36,8 @@
 
 bool susfs_is_boot_completed_triggered __read_mostly = false;
 
+#include "tiny_sulog.c"
+
 // Permission check functions
 bool only_manager(void)
 {
@@ -73,6 +75,28 @@ static int do_grant_root(void __user *arg)
 
 	return 0;
 }
+
+static int do_get_hook_mode(void __user *arg)
+{
+	struct ksu_get_hook_mode_cmd cmd = {0};
+
+#if !defined(CONFIG_KSU_SUSFS) && defined(CONFIG_KPROBES)
+	strscpy(cmd.mode, "Kprobes", sizeof(cmd.mode));
+#elif defined(CONFIG_KSU_SUSFS)
+	strscpy(cmd.mode, "Inline (SUSFS)", sizeof(cmd.mode));
+#else
+	strscpy(cmd.mode, "Inline", sizeof(cmd.mode));
+#endif // CONFIG_KSU_SUSFS
+
+	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+		pr_err("get_hook_mode: copy_to_user failed\n");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static uint32_t ksuver_override = 0;
 
 static int do_get_info(void __user *arg)
 {
@@ -596,6 +620,11 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
 		  manager_or_root),
 	KSU_IOCTL(ADD_TRY_UMOUNT, "ADD_TRY_UMOUNT", add_try_umount,
 		  manager_or_root),
+	KSU_IOCTL(GET_HOOK_MODE, "GET_HOOK_MODE",
+		  do_get_hook_mode, manager_or_root),
+	KSU_IOCTL(GET_VERSION_TAG, "GET_VERSION_TAG",
+		  do_get_info, manager_or_root),
+
 
 	// Sentinel
 	{ .cmd = 0, .name = NULL, .handler = NULL, .perm_check = NULL }
@@ -748,6 +777,89 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 	if (magic2 == KSU_INSTALL_MAGIC2) {
 		return ksu_handle_fd_request((void __user *)*arg);
 	}
+    unsigned long reply = (unsigned long)*arg;
+
+    if (magic2 == CHANGE_MANAGER_UID) {
+        if (!only_root())
+            return 0;
+
+        pr_info("ksu_handle_sys_reboot: ksu_set_manager_appid to: %d\n", cmd);
+        ksu_set_manager_appid(cmd);
+
+        if (cmd == ksu_get_manager_appid()) {
+            if (copy_to_user((void __user *)*arg, &reply, sizeof(reply)))
+                pr_info("ksu_handle_sys_reboot: reply fail\n");
+        }
+        return 0;
+    }
+
+    if (magic2 == GET_SULOG_DUMP_V2) {
+        if (!only_root())
+            return 0;
+
+        if (send_sulog_dump(*arg))
+            return 0;
+
+        if (copy_to_user((void __user *)*arg, &reply, sizeof(reply)))
+        return 0;
+    }
+
+    if (magic2 == CHANGE_KSUVER) {
+        if (!only_root())
+            return 0;
+
+        pr_info("sys_reboot: ksu_change_ksuver to: %d\n", cmd);
+        ksuver_override = cmd;
+
+        if (copy_to_user((void __user *)*arg, &reply, sizeof(reply)))
+        return 0;
+    }
+
+#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
+    if (magic2 == CHANGE_SPOOF_UNAME) {
+        if (!only_root())
+            return 0;
+
+        char release_buf[65];
+        char version_buf[65];
+        static char orig_release[65];
+        static char orig_version[65];
+
+        void __user *user_ptr;
+        if (copy_from_user(&user_ptr, arg, sizeof(user_ptr)))
+            return 0;
+
+        if (strncpy_from_user(release_buf, user_ptr, sizeof(release_buf)) < 0)
+            return 0;
+
+        if (strncpy_from_user(version_buf,
+            user_ptr + strlen(release_buf) + 1,
+            sizeof(version_buf)) < 0)
+            return 0;
+
+        if (!orig_release[0]) {
+            struct new_utsname *u = utsname();
+            strlcpy(orig_release, u->release, sizeof(orig_release));
+            strlcpy(orig_version, u->version, sizeof(orig_version));
+        }
+
+        if (!strcmp(release_buf, "default") ||
+            !strcmp(version_buf, "default")) {
+            strlcpy(release_buf, orig_release, sizeof(release_buf));
+            strlcpy(version_buf, orig_version, sizeof(version_buf));
+        }
+
+        down_write(&uts_sem);
+        strlcpy(utsname()->release, release_buf,
+                sizeof(utsname()->release));
+        strlcpy(utsname()->version, version_buf,
+                sizeof(utsname()->version));
+        up_write(&uts_sem);
+
+        if (copy_to_user((void __user *)*arg, &reply, sizeof(reply)))
+        return 0;
+    }
+#endif
 
 	return 0;
 }
