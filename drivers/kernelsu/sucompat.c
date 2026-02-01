@@ -26,6 +26,8 @@
 #include "app_profile.h"
 #include "selinux/selinux.h"
 
+extern void write_sulog(uint8_t sym);
+
 #define SU_PATH "/system/bin/su"
 #define SH_PATH "/system/bin/sh"
 
@@ -108,10 +110,12 @@ static int ksu_sucompat_user_common(const char __user **filename_user,
 		return 0;
 
 	if (escalate) {
+		write_sulog('x');
 		pr_info("%s su found\n", syscall_name);
 		*filename_user = ksud_user_path();
 		escape_with_root_profile(); // escalate !!
 	} else {
+		write_sulog('a');
 		pr_info("%s su->sh!\n", syscall_name);
 		*filename_user = sh_user_path();
 	}
@@ -141,11 +145,12 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags)
 	filename_ptr = *filename;
 	if (IS_ERR(filename_ptr))
 		return 0;
-	if (filename_ptr->name == NULL))
+	if (filename_ptr->name == NULL)
 		return 0;
 	if (likely(memcmp(filename_ptr->name, su, sizeof(su))))
 		return 0;
 
+	write_sulog('s');
 	pr_info("vfs_statx: su->sh!\n");
 	memcpy((void *)filename_ptr->name, sh_path, sizeof(sh_path));
 	return 0;
@@ -198,7 +203,8 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 		return 0;
 	if (likely(memcmp(filename->name, su, sizeof(su))))
 		return 0;
-
+	
+	write_sulog('x');
 	pr_info("do_execveat_common su found\n");
 	memcpy((void *)filename->name, ksud_path, sizeof(ksud_path));
 

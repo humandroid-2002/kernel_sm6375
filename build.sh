@@ -45,6 +45,7 @@ if [ -d "$ANYKERNEL_DIR" ]; then
   # Remove kernel artifacts
   rm -f "$ANYKERNEL_DIR/dtb"
   rm -f "$ANYKERNEL_DIR/dtbo.img"
+  rm -f "$ANYKERNEL_DIR/Image"
   rm -f "$ANYKERNEL_DIR/Image.gz"
 
   # Remove old KernelSU zip (date-independent)

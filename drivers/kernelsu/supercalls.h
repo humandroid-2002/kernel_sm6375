@@ -9,9 +9,12 @@
 #define KSU_INSTALL_MAGIC1 0xDEADBEEF
 #define KSU_INSTALL_MAGIC2 0xCAFEBABE
 #define CHANGE_MANAGER_UID 10006
-#define GET_SULOG_DUMP_V2 10010
-#define CHANGE_KSUVER 10011
+#define GET_SULOG_DUMP 10009     // get sulog dump, max, last 100 escalations
+#define GET_SULOG_DUMP_V2 10010     // get sulog dump, max, last 250 escalations
+#define CHANGE_KSUVER 10011     // change ksu version
 #define CHANGE_SPOOF_UNAME 10012
+#define KSU_UMOUNT_GETSIZE 107   // get list size // shit is u8 we cant fit 10k+ on it
+#define KSU_UMOUNT_GETLIST 108   // get list
 
 // Command structures for ioctl
 

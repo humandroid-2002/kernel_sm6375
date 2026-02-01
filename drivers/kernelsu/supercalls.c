@@ -9,6 +9,7 @@
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/utsname.h> // utsname() and uts_sem
 #include <linux/kprobes.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
 #include <linux/sched/task.h>
@@ -69,7 +70,9 @@ bool allowed_for_su(void)
 static int do_grant_root(void __user *arg)
 {
 	// we already check uid above on allowed_for_su()
-
+	
+	write_sulog('i'); // log ioctl escalation
+	
 	pr_info("allow root for: %d\n", current_uid().val);
 	escape_with_root_profile();
 
@@ -96,12 +99,31 @@ static int do_get_hook_mode(void __user *arg)
 	return 0;
 }
 
+static int do_get_version_tag(void __user *arg)
+{
+	struct ksu_get_version_tag_cmd cmd = {0};
+
+	strscpy(cmd.tag, KERNEL_SU_VERSION_TAG, sizeof(cmd.tag));
+
+	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+		pr_err("get_version_tag: copy_to_user failed\n");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 static uint32_t ksuver_override = 0;
 
 static int do_get_info(void __user *arg)
 {
-	struct ksu_get_info_cmd cmd = { .version = KERNEL_SU_VERSION,
-					.flags = 0 };
+	struct ksu_get_info_cmd cmd = {
+		.version = KERNEL_SU_VERSION,
+		.flags = 0
+	};
+
+	if (ksuver_override)
+		cmd.version = ksuver_override;   // ksu_ovverride
 
 #ifdef MODULE
 	cmd.flags |= 0x1;
@@ -549,6 +571,56 @@ static int add_try_umount(void __user *arg)
 		return 0;
 	}
 
+		// this way userspace can deduce the memory it has to prepare.
+		case KSU_UMOUNT_GETSIZE: {
+			// check for pointer first
+			if (!cmd.arg)
+				return -EFAULT;
+		
+			size_t total_size = 0; // size of list in bytes
+
+			down_read(&mount_list_lock);
+			list_for_each_entry(entry, &mount_list, list) {
+				total_size = total_size + strlen(entry->umountable) + 1; // + 1 for \0
+			}
+			up_read(&mount_list_lock);
+
+			pr_info("cmd_add_try_umount: total_size: %zu\n", total_size);
+			
+			if (copy_to_user((size_t __user *)cmd.arg, &total_size, sizeof(total_size)))
+				return -EFAULT;
+
+			return 0;
+		}
+		
+		// WARNING! this is straight up pointerwalking.
+		// this way we dont need to redefine the ioctl defs.
+		// this also avoids us needing to kmalloc
+		// userspace have to send pointer to memory (malloc/alloca) or pointer to a VLA.
+		case KSU_UMOUNT_GETLIST: {
+			if (!cmd.arg)
+				return -EFAULT;
+			
+			void *user_buf = (void *)cmd.arg;
+
+			down_read(&mount_list_lock);
+			list_for_each_entry(entry, &mount_list, list) {
+				pr_info("cmd_add_try_umount: entry: %s\n", entry->umountable);
+			
+				if (copy_to_user(user_buf, entry->umountable, strlen(entry->umountable) + 1 )) {
+
+					up_read(&mount_list_lock);
+					return -EFAULT;
+				}
+				
+				// walk it! +1 for null terminator
+				user_buf = user_buf + strlen(entry->umountable) + 1;
+			}
+
+			up_read(&mount_list_lock);
+
+			return 0;
+		}
 	default: {
 		pr_err("cmd_add_try_umount: invalid operation %u\n", cmd.mode);
 		return -EINVAL;
@@ -623,7 +695,7 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
 	KSU_IOCTL(GET_HOOK_MODE, "GET_HOOK_MODE",
 		  do_get_hook_mode, manager_or_root),
 	KSU_IOCTL(GET_VERSION_TAG, "GET_VERSION_TAG",
-		  do_get_info, manager_or_root),
+		  do_get_version_tag, manager_or_root),
 
 
 	// Sentinel
@@ -870,9 +942,12 @@ void ksu_supercalls_init(void)
 
 	pr_info("KernelSU IOCTL Commands:\n");
 	for (i = 0; ksu_ioctl_handlers[i].handler; i++) {
-		pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name,
+		pr_info("  %-18s = 0x%08x\n",
+			ksu_ioctl_handlers[i].name,
 			ksu_ioctl_handlers[i].cmd);
 	}
+
+	sulog_init_heap(); // INITZIALIZZAZIONE SULOG
 }
 
 void ksu_supercalls_exit(void)

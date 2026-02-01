@@ -25,8 +25,10 @@ ccflags-y += -I$(objtree)/security/selinux -include $(srctree)/include/uapi/asm-
 obj-$(CONFIG_KSU) += kernelsu.o
 
 KSU_VERSION=33151
+$(info -- KSU tag: $(KSU_VERSION_TAG))
 $(info -- KernelSU version: $(KSU_VERSION))
 ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
+ccflags-y += -DKSU_VERSION_TAG=\"v3.0.0\"
 
 # SELinux drivers check
 ifeq ($(shell grep -q "current_sid(void)" $(srctree)/security/selinux/include/objsec.h; echo $$?),0)
