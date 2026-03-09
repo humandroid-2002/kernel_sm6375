@@ -1,16 +1,16 @@
 #include <linux/lsm_hooks.h>
 #include <linux/uidgid.h>
 #include <linux/version.h>
-#include <linux/dcache.h>
+#include <linux/binfmts.h>
 #include <linux/err.h>
-#include <linux/uidgid.h>
-#include <linux/string.h>
 
 #include "klog.h" // IWYU pragma: keep
-#include "kernel_compat.h"
 #include "ksud.h"
+#include "kernel_compat.h"
 #include "setuid_hook.h"
 #include "throne_tracker.h"
+
+#ifndef KSU_KPROBES_HOOK
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) ||                           \
 	defined(CONFIG_IS_HW_HISI) || defined(CONFIG_KSU_ALLOWLIST_WORKAROUND)
@@ -67,12 +67,14 @@ static int ksu_inode_rename(struct inode *old_inode, struct dentry *old_dentry,
 		new_dentry->d_iname, buf);
 
 	/*
-	 * RKSU: track_throne(true) only occurs when
-	 * on_boot_completed. So let's make it once-lock.
+	 * RKSU note:
+	 * track_throne(true) only occurs on on_boot_completed event.
+	 * When using this LSM, we must handle it here, else it returns
+	 * ENOENT (-2).
 	 */
-	static bool do_once = false;
-	if (ksu_boot_completed && !do_once) {
-		do_once = true;
+	static bool did = false;
+	if (ksu_boot_completed && !did) {
+		did = true;
 		track_throne(true);
 		return 0;
 	}
@@ -85,16 +87,31 @@ static int ksu_inode_rename(struct inode *old_inode, struct dentry *old_dentry,
 static int ksu_task_fix_setuid(struct cred *new, const struct cred *old,
 			       int flags)
 {
-	kuid_t old_uid, new_uid, new_euid;
+	kuid_t new_uid = new->uid;
+	kuid_t new_euid = new->euid;
 
-	if (!new || !old)
-		return 0;
+	return ksu_handle_setresuid((uid_t)new_uid.val, (uid_t)new_euid.val,
+				    (uid_t)new_uid.val);
+}
 
-	old_uid = old->uid;
-	new_uid = new->uid;
-	new_euid = new->euid;
+#ifndef DEVPTS_SUPER_MAGIC
+#define DEVPTS_SUPER_MAGIC	0x1cd1
+#endif
 
-	return ksu_handle_setuid_common(new_uid.val, old_uid.val, new_euid.val);
+extern int __ksu_handle_devpts(struct inode *inode); // sucompat.c
+
+#ifdef CONFIG_COMPAT
+bool ksu_is_compat __read_mostly = false;
+#endif
+
+int ksu_inode_permission(struct inode *inode, int mask)
+{
+	if (inode && inode->i_sb 
+		&& unlikely(inode->i_sb->s_magic == DEVPTS_SUPER_MAGIC)) {
+		//pr_info("%s: handling devpts for: %s \n", __func__, current->comm);
+		__ksu_handle_devpts(inode);
+	}
+	return 0;
 }
 
 static struct security_hook_list ksu_hooks[] = {
@@ -102,8 +119,11 @@ static struct security_hook_list ksu_hooks[] = {
 	defined(CONFIG_IS_HW_HISI) || defined(CONFIG_KSU_ALLOWLIST_WORKAROUND)
 	LSM_HOOK_INIT(key_permission, ksu_key_permission),
 #endif
+#ifndef KSU_KPROBES_HOOK
+	LSM_HOOK_INIT(inode_permission, ksu_inode_permission),
 	LSM_HOOK_INIT(inode_rename, ksu_inode_rename),
 	LSM_HOOK_INIT(task_fix_setuid, ksu_task_fix_setuid)
+#endif
 };
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
@@ -125,3 +145,9 @@ void __init ksu_lsm_hook_init(void)
 #endif
 	pr_info("LSM hooks initialized.\n");
 }
+#else
+void ksu_lsm_hook_init(void)
+{
+	return;
+}
+#endif

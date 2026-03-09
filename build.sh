@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usa la toolchain della ROM (NO toolchain Motorola)
-CLANG_BIN=$HOME/BACKUP-FOLDER/kernel_workspace/clang-r547379/bin
+CLANG_BIN="$(cd "$(dirname "$0")/../.." && pwd)/clang-r547379/bin"
 
 
 if [ ! -d "$CLANG_BIN" ]; then
