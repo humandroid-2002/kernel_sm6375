@@ -129,7 +129,7 @@ static int do_report_event(void __user *arg)
 			pr_info("boot_complete triggered\n");
 			on_boot_completed();
 #ifdef CONFIG_KSU_SUSFS
-            susfs_start_sdcard_monitor_fn();
+            susfs_is_boot_completed_triggered = true;
 #endif // #ifdef CONFIG_KSU_SUSFS
 		}
 		break;
@@ -528,10 +528,12 @@ static int do_manage_mark(void __user *arg)
 static int do_get_hook_mode(void __user *arg)
 {
 	struct ksu_get_hook_mode_cmd cmd = {0};
-	const char *type = "Kprobes";
+	const char *type = "Inline";
 
-#ifndef KSU_KPROBES_HOOK
-	type = "Manual";
+#if defined(CONFIG_KPROBES) && !defined(CONFIG_KSU_SUSFS)
+	type = "Kprobes";
+#elif defined(CONFIG_KSU_SUSFS)
+	type = "Inline (SUSFS)";
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
@@ -876,8 +878,8 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-        if (cmd == CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS) {
-            susfs_set_hide_sus_mnts_for_non_su_procs(arg);
+        if (cmd == CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS) {
+            susfs_set_hide_sus_mnts_for_all_procs(arg);
             return 0;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
@@ -897,7 +899,7 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
 #endif //#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
         if (cmd == CMD_SUSFS_ADD_TRY_UMOUNT) {
-            susfs_add_try_umount(arg);
+            add_try_umount(arg);
             return 0;
         }
 #endif //#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
