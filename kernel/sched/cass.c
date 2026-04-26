@@ -79,8 +79,8 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 	if (sync && (cass_eq(a->cpu, this_cpu) || !cass_cmp(b->cpu, this_cpu)))
 		goto done;
 
-	/* Prefer the CPU with lower idle exit latency */
-	if (cass_cmp(b->exit_lat, a->exit_lat))
+	/* Prefer the CPU with higher idle exit latency */
+	if (cass_cmp(a->exit_lat, b->exit_lat))
 		goto done;
 
 	/* Prefer the previous CPU */
@@ -116,7 +116,7 @@ static int cass_best_cpu(struct task_struct *p, int prev_cpu, bool sync)
 	 * idle_get_state().
 	 */
 	rcu_read_lock();
-	for_each_cpu_and(cpu, &p->cpus_allowed, cpu_active_mask) {
+	for_each_cpu_and(cpu, p->cpus_ptr, cpu_active_mask) {
 		/* Use the free candidate slot */
 		struct rq *rq = cpu_rq(cpu);
 		curr = &cands[cidx];
@@ -201,8 +201,8 @@ static int cass_select_task_rq_fair(struct task_struct *p, int prev_cpu,
 	 * first valid CPU since it's possible for certain types of tasks to run
 	 * on inactive CPUs.
 	 */
-	if (unlikely(!cpumask_intersects(&p->cpus_allowed, cpu_active_mask)))
-		return cpumask_first(&p->cpus_allowed);
+	if (unlikely(!cpumask_intersects(p->cpus_ptr, cpu_active_mask)))
+		return cpumask_first(p->cpus_ptr);
 
 	/* cass_best_cpu() needs the task's utilization, so sync it up */
 	if (!(sd_flag & SD_BALANCE_FORK))
