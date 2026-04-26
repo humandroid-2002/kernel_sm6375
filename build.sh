@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usa la toolchain della ROM (NO toolchain Motorola)
-CLANG_BIN=$HOME/BACKUP-FOLDER/kernel_workspace/clang-r547379/bin
+CLANG_BIN="$(cd "$(dirname "$0")/../.." && pwd)/clang-r547379/bin"
 
 
 if [ ! -d "$CLANG_BIN" ]; then
@@ -14,8 +14,8 @@ export PATH=$PWD/scripts:$PATH # chmod +x scripts/mkdtimg or create a wrapper fi
 #!/bin/sh
 #exec python3 $(dirname "$0")/mkdtboimg.py "$@"
 #EOF
-
 export LLVM_DIR=$CLANG_BIN
+
 
 SECONDS=0
 export KBUILD_BUILD_USER=yama
@@ -23,22 +23,38 @@ export LLVM=1
 export AnyKernel3=AnyKernel3
 export TIME="$(date "+%Y%m%d")"
 export modpath=${AnyKernel3}/modules/vendor/lib/modules
-
 export ARCH=arm64
 
-if [ -z "$DEVICE" ]; then
-export DEVICE=bangkk
+# ===============================
+# AnyKernel pre-clean (auto)
+# ===============================
+
+ANYKERNEL_DIR="AnyKernel3"
+
+if [ -d "$ANYKERNEL_DIR" ]; then
+  echo "[*] Cleaning AnyKernel directory..."
+
+  # Remove directories
+  rm -rf "$ANYKERNEL_DIR/modules"
+  rm -rf "$ANYKERNEL_DIR/config"
+
+  # Remove kernel artifacts
+  rm -f "$ANYKERNEL_DIR/dtb"
+  rm -f "$ANYKERNEL_DIR/dtbo.img"
+  rm -f "$ANYKERNEL_DIR/Image"
+  rm -f "$ANYKERNEL_DIR/Image.gz"
+
+  # Remove old KernelSU zip (date-independent)
+  rm -f "$ANYKERNEL_DIR"/KernelSU_*.zip
+
+  echo "[*] AnyKernel cleaned"
+else
+  echo "[!] AnyKernel directory not found, skipping cleanup"
 fi
 
-if [[ -z "$1" || "$1" = "-c" ]]; then
-echo "Clean Build"
-rm -rf out
-elif [ "$1" = "-d" ]; then
-echo "Dirty Build"
-else
-echo "Error: Set $1 to -c or -d"
-exit 1
-fi
+# ===============================
+# Build environment
+# ===============================
 
 ARGS='
 CC=clang
@@ -62,9 +78,10 @@ LLVM_IAS=1
 '
 rm -rf out
 make ${ARGS} O=out bangkk_defconfig
+make O=out menuconfig
 make ${ARGS} O=out -j$(nproc)
 
-[ ! -e "out/arch/arm64/boot/Image" ] && \
+[ ! -e "out/arch/arm64/boot/Image.gz" ] && \
 echo "  ERROR : image binary not found in any of the specified locations , fix compile!" && \
 exit 1
 
@@ -82,7 +99,7 @@ kmod=$(echo ${kver} | awk -F'.' '{print $3}')
 
 #Copy stuff
 cp out/.config ${AnyKernel3}/config
-cp out/arch/arm64/boot/Image ${AnyKernel3}/Image
+cp out/arch/arm64/boot/Image.gz ${AnyKernel3}/Image.gz
 cp out/arch/arm64/boot/dtb.img ${AnyKernel3}/dtb
 cp out/arch/arm64/boot/dtbo.img ${AnyKernel3}/dtbo.img
 #cp build.sta/${DEVICE}_modules.blocklist ${modpath}/modules.blocklist
