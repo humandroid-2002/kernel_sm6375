@@ -359,11 +359,26 @@ extern void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode, dev_t *out_d
 extern int susfs_open_redirect_spoof_show_map_vma(struct inode *inode, unsigned long *out_ino, dev_t *out_dev, char *spoofed_name);
 #endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 
+static void show_vma_header_prefix_fake(struct seq_file *m,
+					unsigned long start,
+					unsigned long end, vm_flags_t flags,
+					unsigned long long pgoff, dev_t dev,
+					unsigned long ino)
+{
+	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
+	seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ", start,
+		   end, flags & VM_READ ? 'r' : '-',
+		   flags & VM_WRITE ? 'w' : '-', flags & VM_EXEC ? '-' : '-',
+		   flags & VM_MAYSHARE ? 's' : 'p', pgoff, MAJOR(dev),
+		   MINOR(dev), ino);
+}
+
 static void
 show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct file *file = vma->vm_file;
+	struct dentry *dentry;
 	vm_flags_t flags = vma->vm_flags;
 	unsigned long ino = 0;
 	unsigned long long pgoff = 0;
@@ -405,6 +420,30 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+		dentry = file->f_path.dentry;
+		
+		if (dentry && dentry->d_name.name) {
+		const char *path = dentry->d_name.name;
+
+		if (strstr(path, "lineage")) {
+		start = vma->vm_start;
+		end = vma->vm_end;
+
+		show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
+		name = "/system/framework/framework-res.apk";
+		goto done;
+		}
+
+		if (strstr(path, "jit-zygote-cache")) {
+		start = vma->vm_start;
+		end = vma->vm_end;
+
+		show_vma_header_prefix_fake(m, start, end, flags, pgoff, dev, ino);
+		name = "[jit-zygote-cache]";
+		goto done;
+		}
+	}
+
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 		susfs_sus_kstat_spoof_show_map_vma(inode, &dev, &ino);
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
