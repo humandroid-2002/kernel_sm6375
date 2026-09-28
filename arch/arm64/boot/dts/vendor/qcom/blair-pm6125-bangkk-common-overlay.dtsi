@@ -20,3 +20,9 @@
 &smb1394 {
 	status = "disabled";
 };
+
+&reserved_memory {
+    ramoops_mem {
+        /delete-property/ console-size;
+    };
+};
